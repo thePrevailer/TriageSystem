@@ -68,7 +68,7 @@ Everyone starts with 1 hour on the clock when they join the line. Here's what ha
 
 The clock is **simulated**: time only passes when the program calls `advanceTime(hours)`, not in real life.
 
-## Example: the waiting line in action
+## Example
 
 In Test 4, all 15 beds are full. Rita arrives with a migraine (level 4) and waits 4 hours, so she
 moves up to level 3. Then Zainab (broken leg, level 3) and Peter (cardiac arrest, level 1) arrive:
@@ -114,7 +114,7 @@ A patient is always in one of these states:
 
 ## Data structures used (and why)
 
-| What we used | What it stores | Why we picked it |
+| Used | What it stores | Why  |
 |---|---|---|
 | **Priority queue** (a binary heap) | The waiting line | Always keeps the sickest patient at the front, without sorting the whole line. |
 | **HashMap** | Illness → level (e.g. "flu" → 4) | Finds a patient's level instantly instead of searching every list. |
