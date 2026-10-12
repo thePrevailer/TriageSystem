@@ -1,15 +1,13 @@
 # Emergency Department Triage System
 
-Department of Engineering Technology, Grambling State University
-
-A Java program that runs a small hospital emergency room: it decides how sick each patient is,
+A Java program that runs a hospital emergency room: it decides how sick each patient is,
 gives beds to the sickest patients first, and keeps everyone else in a fair waiting line.
 
 ## What is this?
 
-In a real emergency room, patients are not seen in the order they arrive. A person having a
+In a real emergency room, patients are not seen in the order they arrive. For example, someone having a
 heart attack goes ahead of someone with the flu, even if they walked in an hour later.
-This is called **triage**.
+This system is called a **triage system**.
 
 This program does the same thing. When a patient arrives, it:
 
