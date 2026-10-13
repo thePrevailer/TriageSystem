@@ -83,6 +83,7 @@ public class EmergencyDepartment {
         if (dismissIfNonUrgent(p)) return false;
         p.setStatus(Patient.Status.WAITING);
         waitHours.put(p.getId(), 0);   // a new arrival has waited 0 hours
+        p.setLevel(p.getOriginalLevel());   // rejoining the line starts fresh, so the level matches 0 hours
         waitingQueue.offer(p);
         System.out.printf("  [QUEUED]   %s added to the waiting line (%s)%n",
                 p.getName(), TriageRules.levelName(p.getLevel()));
