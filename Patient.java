@@ -1,6 +1,5 @@
 /*
  * Emergency Department Triage System
- * Department of Engineering Technology
  * Grambling State University, Grambling, LA 71245
  */
 
