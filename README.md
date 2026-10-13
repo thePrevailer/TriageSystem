@@ -57,14 +57,14 @@ The full lists are in `TriageRules.java`.
 
 ### How waiting moves a patient up
 
-Everyone starts with 1 hour on the clock when they join the line. Here's what happens to a level 4 patient who keeps waiting:
+Everyone starts with 0 hours on the clock when they join the line. Here's what happens to a level 4 patient who keeps waiting:
 
 | Hours waited | Level |
 |---|---|
-| 1 – 4 | 4 (Less urgent) |
-| 5 – 8 | 3 (Urgent) |
-| 9 – 12 | 2 (Emergent) |
-| 13 or more | 1 (Critical) |
+| 0 – 3 | 4 (Less urgent) |
+| 4 – 7 | 3 (Urgent) |
+| 8 – 11 | 2 (Emergent) |
+| 12 or more | 1 (Critical) |
 
 The clock is **simulated**: time only passes when the program calls `advanceTime(hours)`, not in real life.
 
@@ -76,13 +76,13 @@ moves up to level 3. Then Zainab (broken leg, level 3) and Peter (cardiac arrest
 ```
 [QUEUED]   Rita Cole added to the waiting line (Level 4 Less urgent)
 [CLOCK]    4 hour(s) pass. Hour is now 4.
-[AGING]    Rita Cole waited 5 hrs: Level 4 Less urgent -> Level 3 Urgent
+[AGING]    Rita Cole waited 4 hrs: Level 4 Less urgent -> Level 3 Urgent
 [QUEUED]   Zainab Musa added to the waiting line (Level 3 Urgent)
 [QUEUED]   Peter Okafor added to the waiting line (Level 1 Critical)
 ---- Waiting line (3) - served in this order ----
-1. P020 Peter Okafor   | Level 1 | Cardiac arrest | waited 1 hr(s)
-2. P018 Rita Cole      | Level 3 | Migraine | waited 5 hr(s)
-3. P019 Zainab Musa    | Level 3 | Broken leg | waited 1 hr(s)
+1. P020 Peter Okafor   | Level 1 | Cardiac arrest | waited 0 hr(s)
+2. P018 Rita Cole      | Level 3 | Migraine | waited 4 hr(s)
+3. P019 Zainab Musa    | Level 3 | Broken leg | waited 0 hr(s)
 ```
 
 - **Peter** arrived last but goes first, because he is the sickest.
@@ -112,6 +112,9 @@ Main  ──sends a patient──▶  EmergencyDepartment  ──"how sick?"─�
 A patient is always in one of these states:
 **New** (just arrived) → **Waiting** or **In bed** → **Discharged** (treated) or **Dismissed** (sent home as level 5).
 
+Each patient is recorded once. A patient refused a bed can try again (even as a new `Patient` with the same ID)
+without being counted twice. Two different patients can't share an ID, and nobody can join the line twice.
+
 ## Data structures used (and why)
 
 | Used | What it stores | Why  |
@@ -119,7 +122,7 @@ A patient is always in one of these states:
 | **Priority queue** (a binary heap) | The waiting line | Always keeps the sickest patient at the front, without sorting the whole line. |
 | **HashMap** | Illness → level (e.g. "flu" → 4) | Finds a patient's level instantly instead of searching every list. |
 | **HashMap** | Patient ID → hours waited | Tracks how long each person has waited. |
-| **ArrayList** | Every patient who came in | Keeps a full record, even after patients leave. |
+| **LinkedHashMap** | Patient ID → every patient who came in | Keeps a full record in arrival order, even after patients leave, and finds anyone by ID instantly. |
 | **2D array** (5 rooms × 3 beds) | The 15 beds | The number of beds never changes, so a fixed-size array fits. |
 
 ### How fast is each operation?
@@ -130,7 +133,7 @@ A patient is always in one of these states:
 | Add a patient to the line | O(log n) | Very fast, even with a long line |
 | Take the next patient from the line | O(log n) | Very fast, even with a long line |
 | See who's next (peek) | O(1) | Instant |
-| Find a patient by ID | O(n) | Checks each record one by one |
+| Find a patient by ID | O(1) | Instant |
 
 *n = number of patients*
 
@@ -152,6 +155,6 @@ A patient is always in one of these states:
 At the end, the program prints a summary like this:
 
 ```
-Total patients seen: 20 | In beds: 12 | Waiting: 1 | Discharged: 6 | Dismissed: 1
+Total patients seen: 19 | In beds: 12 | Waiting: 1 | Discharged: 5 | Dismissed: 1
 Free beds: 3/15 | Queue size: 1
 ```

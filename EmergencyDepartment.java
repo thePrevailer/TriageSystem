@@ -13,7 +13,7 @@ public class EmergencyDepartment {
     private static final int TOTAL_BEDS = ROOMS * BEDS_PER_ROOM;
 
     private final TriageRules rules = new TriageRules();
-    private final ArrayList<Patient> patientRecords = new ArrayList<>();      // everyone who has ever arrived
+    private final LinkedHashMap<String, Patient> patientRecords = new LinkedHashMap<>(); // ID -> everyone who has ever arrived, in arrival order
     private final HashMap<String, Integer> waitHours = new HashMap<>();      // patient ID -> hours waited
     private final PriorityQueue<Patient> waitingQueue =                      // most severe patient at the front
             new PriorityQueue<>(new TriageRules.PatientComparator());
@@ -25,11 +25,13 @@ public class EmergencyDepartment {
     // ---------- Triage ----------
 
     // First time we see a patient: give them a level and an arrival number, and save them in the records.
+    // A patient refused earlier is recorded only once, even if they come back as a new Patient object.
     private void triage(Patient p) {
-        if (p.getStatus() != Patient.Status.NEW) return;   // already triaged
+        Patient recorded = patientRecords.get(p.getId());
+        if (recorded == p) return;   // already recorded, even after a rejected bed attempt
         p.setStartingLevel(rules.levelFor(p.getSymptom()));
-        p.setArrivalNumber(nextArrivalNumber++);
-        patientRecords.add(p);
+        p.setArrivalNumber(recorded != null ? recorded.getArrivalNumber() : nextArrivalNumber++);
+        patientRecords.put(p.getId(), p);   // replaces the refused record instead of adding a second one
     }
 
     // Level 5 patients are refused a bed. Returns true if the patient was sent home.
@@ -38,6 +40,29 @@ public class EmergencyDepartment {
         p.setStatus(Patient.Status.DISMISSED);
         System.out.printf("  [DISMISSED] %s - '%s' is %s. Refused a bed.%n",
                 p.getName(), p.getSymptom(), TriageRules.levelName(p.getLevel()));
+        return true;
+    }
+
+    // Refuses duplicate IDs, patients who are already in a bed or done, and joining the line twice.
+    // toQueue is false for a direct bed admission, so a waiting patient can still be given a bed.
+    private boolean canAdmit(Patient p, boolean toQueue) {
+        Patient recorded = patientRecords.get(p.getId());
+        // A NEW record was refused a bed (or taken off the line), so this is the same patient trying again.
+        if (recorded != null && recorded != p && recorded.getStatus() != Patient.Status.NEW) {
+            System.out.printf("  [REJECTED] Patient ID %s already exists.%n", p.getId());
+            return false;
+        }
+        if (p.getStatus() == Patient.Status.IN_BED
+                || p.getStatus() == Patient.Status.DISCHARGED
+                || p.getStatus() == Patient.Status.DISMISSED) {
+            System.out.printf("  [REJECTED] %s cannot be admitted from status %s.%n",
+                    p.getName(), p.getStatus());
+            return false;
+        }
+        if (toQueue && p.getStatus() == Patient.Status.WAITING) {   // WAITING always means in the line
+            System.out.printf("  [REJECTED] %s is already waiting.%n", p.getName());
+            return false;
+        }
         return true;
     }
 
@@ -53,10 +78,11 @@ public class EmergencyDepartment {
     // Required: triage a patient and put them in the waiting line. O(log n)
     public boolean admitPatient(Patient p) {
         if (isNull(p)) return false;
+        if (!canAdmit(p, true)) return false;
         triage(p);
         if (dismissIfNonUrgent(p)) return false;
         p.setStatus(Patient.Status.WAITING);
-        waitHours.put(p.getId(), 1);   // everyone starts with 1 hour of waiting
+        waitHours.put(p.getId(), 0);   // a new arrival has waited 0 hours
         waitingQueue.offer(p);
         System.out.printf("  [QUEUED]   %s added to the waiting line (%s)%n",
                 p.getName(), TriageRules.levelName(p.getLevel()));
@@ -71,17 +97,17 @@ public class EmergencyDepartment {
             System.out.printf("  [REJECTED] Bed %d does not exist (beds 1-%d).%n", bedNumber, TOTAL_BEDS);
             return false;
         }
+        if (!canAdmit(p, false)) return false;
         triage(p);
         if (dismissIfNonUrgent(p)) return false;
-        if (p.getStatus() == Patient.Status.IN_BED) {
-            System.out.printf("  [REJECTED] %s is already in bed %d.%n", p.getName(), p.getBedNumber());
-            return false;
-        }
         Patient occupant = getBed(bedNumber);
         if (occupant != null) {
             System.out.printf("  [REJECTED] Bed %d is occupied by %s. Cannot admit %s.%n",
                     bedNumber, occupant.getName(), p.getName());
             return false;
+        }
+        if (p.getStatus() == Patient.Status.WAITING) {
+            waitingQueue.remove(p);   // direct admission must also remove queue membership
         }
         waitHours.remove(p.getId());   // no longer waiting
         setBed(bedNumber, p);
@@ -95,7 +121,10 @@ public class EmergencyDepartment {
     // Required: remove and return the most severe waiting patient. O(log n)
     public Patient getNextPatient() {
         Patient next = waitingQueue.poll();
-        if (next != null) waitHours.remove(next.getId());
+        if (next != null) {
+            waitHours.remove(next.getId());
+            next.setStatus(Patient.Status.NEW);   // out of the line, not yet in a bed; can be queued or bedded again
+        }
         return next;
     }
 
@@ -133,6 +162,7 @@ public class EmergencyDepartment {
             return false;
         }
         setBed(bedNumber, null);
+        p.setBedNumber(0);
         p.setStatus(Patient.Status.DISCHARGED);
         System.out.printf("  [DISCHARGED] %s from %s%n", p.getName(), bedLabel(bedNumber));
         return true;
@@ -151,6 +181,7 @@ public class EmergencyDepartment {
     // Move the clock forward and update every waiting patient's wait time and level.
     // A heap can't re-sort itself when levels change, so we empty it, update everyone, and refill it.
     public void advanceTime(int hours) {
+        if (hours < 0) throw new IllegalArgumentException("Hours cannot be negative.");
         currentHour += hours;
         System.out.printf("  [CLOCK]    %d hour(s) pass. Hour is now %d.%n", hours, currentHour);
 
@@ -171,10 +202,10 @@ public class EmergencyDepartment {
 
     // ---------- Search and display ----------
 
-    // Look up a patient by ID in the records and say where they are. O(n)
+    // Look up a patient by ID in the records and say where they are. O(1)
     public void findPatient(String id) {
-        for (Patient p : patientRecords) {
-            if (!p.getId().equals(id)) continue;
+        Patient p = patientRecords.get(id);
+        if (p != null) {
             String where;
             switch (p.getStatus()) {
                 case IN_BED:     where = "in " + bedLabel(p.getBedNumber()); break;
@@ -214,7 +245,7 @@ public class EmergencyDepartment {
     // Count patients in each status and print the totals.
     public void displayStatistics() {
         int inBed = 0, waiting = 0, discharged = 0, dismissed = 0;
-        for (Patient p : patientRecords) {
+        for (Patient p : patientRecords.values()) {
             if (p.getStatus() == Patient.Status.IN_BED) inBed++;
             else if (p.getStatus() == Patient.Status.WAITING) waiting++;
             else if (p.getStatus() == Patient.Status.DISCHARGED) discharged++;

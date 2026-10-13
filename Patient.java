@@ -23,9 +23,14 @@ public class Patient {
     private Status status = Status.NEW;
 
     public Patient(String id, String name, String symptom) {
-        this.id = id;
-        this.name = name;
-        this.symptom = symptom;
+        if (id == null || id.trim().isEmpty()
+                || name == null || name.trim().isEmpty()
+                || symptom == null || symptom.trim().isEmpty()) {
+            throw new IllegalArgumentException("Patient ID, name and symptom are required.");
+        }
+        this.id = id.trim();
+        this.name = name.trim();
+        this.symptom = symptom.trim();
     }
 
     // Getters: let the other files read this patient's information.

@@ -57,9 +57,9 @@ public class TriageRules {
         return illnessToLevel.getOrDefault(symptom.trim().toLowerCase(), UNKNOWN_LEVEL);
     }
 
-    // Aging: everyone starts at 1 hour, and each full 4 hours after that moves them up one level (never past 1).
+    // Aging: everyone starts at 0 hours, and each full 4 hours moves them up one level (never past 1).
     public static int agedLevel(int originalLevel, int hoursWaited) {
-        int promotions = (hoursWaited - 1) / HOURS_PER_PROMOTION;
+        int promotions = hoursWaited / HOURS_PER_PROMOTION;
         return Math.max(1, originalLevel - promotions);
     }
 
